@@ -1,0 +1,113 @@
+--qn 1
+
+select 
+*
+FROM
+(
+select 
+item_id,
+max (case when test_a = '1' then '1'
+else '0'
+end) as test_assignment,
+max (case when item_id is not null then 'item_test_1'
+else null
+end) as test_number,
+max (case when item_id is not null then '2013-01-05 00:00'::timestamp
+else null
+end) as test_start_date
+from 
+  dsv1069.final_assignments_qa
+group by item_id
+
+UNION 
+
+select 
+item_id,
+max (case when test_b = '1' then '1'
+else '0'
+end) as test_assignment,
+max (case when item_id is not null then 'item_test_2'
+else null
+end) as test_number,
+max (case when item_id is not null then '2015-03-14 00:00'::timestamp
+else null
+end) as test_start_date
+from 
+  dsv1069.final_assignments_qa
+group by item_id 
+
+union 
+
+(select 
+item_id,
+max (case when test_c = '1' then '1'
+else '0'
+end) as test_assignment,
+max (case when item_id is not null then 'item_test_3'
+else null
+end) as test_number,
+max (case when item_id is not null then '2016-01-07 00:00'::timestamp
+else null
+end) as test_start_date
+from 
+  dsv1069.final_assignments_qa
+group by item_id)
+
+)  as union_test_number
+
+
+--qn 2
+
+SELECT
+test_assignment,
+count (test_assignment) as count_n,
+sum (binary_order) as binary_count,
+sum (binary_order_30days) as binary_count_30days
+from 
+(
+select 
+final_assignments.item_id,
+test_assignment, 
+max (case when created_at>test_start_date then 1 else 0 end ) as binary_order,
+max (case when (created_at>test_start_date and date_part ('day', created_at - test_start_date) <= 30) then 1 else 0 end) as binary_order_30days
+from 
+dsv1069.final_assignments
+left outer JOIN
+dsv1069.orders
+on dsv1069.final_assignments.item_id = dsv1069.orders.item_id
+where test_number = 'item_test_2'
+group by final_assignments.item_id, test_assignment) item_level
+group by test_assignment
+
+
+--qn 3
+
+SELECT
+test_assignment,
+count (test_assignment) as count_n,
+sum (binary_order) as binary_count,
+sum (binary_order_30days) as binary_count_30days
+from 
+(
+select 
+final_assignments.item_id,
+test_assignment, 
+max (case when event_time>test_start_date then 1 else 0 end ) as binary_order,
+max (case when (event_time>test_start_date and date_part ('day', event_time - test_start_date) <= 30) then 1 else 0 end) as binary_order_30days
+from 
+dsv1069.final_assignments
+left outer JOIN
+
+(SELECT 
+event_id, event_time, 
+max (case when parameter_name = 'item_id' then cast (parameter_value as int) else null end) as item_id
+FROM 
+dsv1069.events
+where event_name = 'view_item'  and parameter_name = 'item_id'
+group by event_id, event_time ) view_item
+
+on dsv1069.final_assignments.item_id = view_item.item_id
+where test_number = 'item_test_2'
+group by final_assignments.item_id, test_assignment) item_level
+group by test_assignment
+LIMIT 100
